@@ -490,6 +490,16 @@ Integration test scenarios:
   - All 26 tests passing (18 new + 8 existing)
   - Session-based cart persistence with HttpSession
   - Backend DoD completed 100%
+- 2025-09-30 12:00 UTC - Rex: Frontend implementation completed following strict TDD:
+  - TypeScript types created (Order, OrderLine, AddItemRequest)
+  - OrderService with API integration (6 tests written first)
+  - QuantitySelector component (9 tests written first)
+  - CartIcon component with badge (7 tests written first)
+  - CartPage component (8 tests written first)
+  - MenuPage updated with add-to-cart (14 tests total: 6 existing + 8 new)
+  - React Router configured for navigation
+  - All 49 tests passing (43 new + 6 existing)
+  - Frontend DoD completed 100%
 
 ## Notes
 This task builds on the menu browsing feature by introducing order management. It focuses on cart functionality without external dependencies (no payment, no SMS), making it a clean vertical slice. The implementation establishes:
