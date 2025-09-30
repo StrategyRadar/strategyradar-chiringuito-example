@@ -298,7 +298,119 @@ tests/
 - [ ] Integration testing
 
 ### Implementation Plan
-*To be defined by Javier and Rex during implementation*
+
+**Phase 1: Database Foundation**
+1. Create V3__create_orders_table.sql migration:
+   - Table: orders
+   - Columns: id (UUID PK), status (VARCHAR, default 'PENDING'), total_amount (DECIMAL 10,2), created_at (TIMESTAMP)
+   - Index on created_at for performance
+
+2. Create V4__create_order_lines_table.sql migration:
+   - Table: order_lines
+   - Columns: id (UUID PK), order_id (UUID FK), menu_item_id (UUID FK), quantity (INT), unit_price (DECIMAL 10,2), line_total (DECIMAL 10,2)
+   - Foreign keys: order_id -> orders.id, menu_item_id -> menu_items.id
+   - Index on order_id for performance
+
+**Phase 2: Domain Layer (Entities & Repositories)**
+1. Create Order entity:
+   - Fields: id, status (enum), totalAmount, createdAt
+   - JPA annotations: @Entity, @Table, @Id, @GeneratedValue(UUID)
+   - Validations: @NotNull for status and totalAmount
+   - Lombok: @Data, @NoArgsConstructor, @AllArgsConstructor, @Builder
+   - Follow MenuItem.java pattern
+
+2. Create OrderLine entity:
+   - Fields: id, orderId, menuItemId, quantity, unitPrice, lineTotal
+   - JPA annotations with foreign key relationships
+   - Validations: @Min(1), @Max(50) for quantity
+   - Lombok annotations
+   - Follow MenuItem.java pattern
+
+3. Create OrderRepository interface:
+   - Extends JpaRepository<Order, UUID>
+   - @Repository annotation
+   - Follow MenuItemRepository.java pattern
+
+4. Create OrderLineRepository interface:
+   - Extends JpaRepository<OrderLine, UUID>
+   - Custom query: findByOrderId(UUID orderId)
+   - @Repository annotation
+
+**Phase 3: Service Layer (DTOs & Exceptions)**
+1. Create DTOs:
+   - AddItemRequest: menuItemId (UUID), quantity (Integer)
+   - OrderLineDTO: orderLineId, menuItemId, menuItemName, quantity, unitPrice, lineTotal
+   - OrderSummaryDTO: orderId, status, totalAmount, itemCount, List<OrderLineDTO>
+   - Use @Data, @Builder from Lombok
+   - Follow MenuItemDTO.java pattern
+
+2. Create custom exceptions:
+   - MenuItemNotFoundException extends RuntimeException
+   - MenuItemUnavailableException extends RuntimeException
+   - MaxItemsExceededException extends RuntimeException
+   - All include constructors with String message
+
+**Phase 4: TDD - AddItemToOrderAction Tests (WRITE TESTS FIRST)**
+Test scenarios for AddItemToOrderAction:
+1. Should create new order when no existing order
+2. Should add item to existing order
+3. Should update quantity when same item added again
+4. Should throw MenuItemNotFoundException when item doesn't exist
+5. Should throw MenuItemUnavailableException when item not available
+6. Should throw MaxItemsExceededException when total > 50 items
+7. Should throw IllegalArgumentException when quantity < 1 or > 50
+8. Should capture price snapshot from MenuItem
+9. Should calculate lineTotal correctly (quantity * unitPrice)
+10. Should calculate order totalAmount correctly (sum of all lineTotals)
+
+**Phase 5: AddItemToOrderAction Implementation**
+1. Implement AddItemToOrderAction service:
+   - Dependencies: MenuItemRepository, OrderRepository, OrderLineRepository, HttpSession
+   - execute(AddItemRequest request, HttpSession session) returns OrderSummaryDTO
+   - Business logic:
+     * Retrieve orderId from session (if exists)
+     * Validate menu item exists and available
+     * Validate quantity (1-50)
+     * Create Order if doesn't exist, save orderId in session
+     * Check/create/update OrderLine
+     * Validate total items <= 50
+     * Capture unitPrice snapshot
+     * Calculate lineTotal and order totalAmount
+     * Persist changes
+     * Return OrderSummaryDTO
+   - Follow BrowseMenuAction.java pattern with @Service, @RequiredArgsConstructor
+
+**Phase 6: TDD - OrderController Tests (WRITE TESTS FIRST)**
+Integration test scenarios:
+1. POST /api/order/add-item returns 200 with order summary
+2. POST with invalid menuItemId returns 404
+3. POST with unavailable item returns 409
+4. POST with invalid quantity returns 400
+5. POST exceeding max items returns 400
+6. Verify session persistence across multiple adds
+
+**Phase 7: OrderController Implementation**
+1. Create OrderController:
+   - @RestController, @RequestMapping("/api/order")
+   - Dependency: AddItemToOrderAction
+   - POST /api/order/add-item endpoint
+   - Accepts AddItemRequest in @RequestBody
+   - Injects HttpSession
+   - Returns OrderSummaryDTO
+   - Exception handling with @ExceptionHandler for custom exceptions
+   - Follow MenuController.java pattern
+
+**Phase 8: Verification & Testing**
+1. Run `mvn clean test` - all tests must pass
+2. Manual verification with Postman/curl
+3. Verify session persistence
+4. Verify database schema matches entity-model.md
+
+**TDD Workflow**:
+- ALWAYS write tests BEFORE implementation
+- Tests should fail initially (red)
+- Implement minimal code to make tests pass (green)
+- No refactoring needed at this stage (keep simple)
 
 ### Testing Strategy
 - [ ] Backend unit tests (AddItemToOrderAction with all validations)
@@ -370,6 +482,14 @@ tests/
 - 2025-09-30 11:33 UTC - Task approved by user, transitioning to IMPLEMENTATION phase
 - 2025-09-30 11:33 UTC - Feature branch 'add_to_cart_feature' created
 - 2025-09-30 11:33 UTC - Handing off to Javier for backend implementation
+- 2025-09-30 11:36 UTC - Javier: Added detailed technical implementation plan with 8 phases following TDD approach
+- 2025-09-30 11:51 UTC - Javier: Backend implementation completed following strict TDD:
+  - Phases 1-3: Database migrations, entities, repositories, DTOs, custom exceptions
+  - Phase 4: 18 tests written FIRST (11 unit + 7 integration)
+  - Phases 5-7: AddItemToOrderAction service and OrderController implemented
+  - All 26 tests passing (18 new + 8 existing)
+  - Session-based cart persistence with HttpSession
+  - Backend DoD completed 100%
 
 ## Notes
 This task builds on the menu browsing feature by introducing order management. It focuses on cart functionality without external dependencies (no payment, no SMS), making it a clean vertical slice. The implementation establishes:
