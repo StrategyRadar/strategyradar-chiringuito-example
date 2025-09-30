@@ -1,12 +1,28 @@
-import type { Order } from '../types/Order';
+import { useEffect, useState } from 'react';
+import { removeItemFromOrder } from '../services/orderService';
+import { useCart } from '../contexts/CartContext';
 
-interface CartPageProps {
-  order: Order | null;
-  loading: boolean;
-  error: string | null;
-}
+export function CartPage() {
+  const { cart: order, refreshCart } = useCart();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
 
-export function CartPage({ order, loading, error }: CartPageProps) {
+  useEffect(() => {
+    setLoading(false);
+  }, []);
+
+  const handleRemoveItem = async (menuItemId: string) => {
+    setRemoving(menuItemId);
+    try {
+      await removeItemFromOrder(menuItemId);
+      await refreshCart();
+    } catch (err) {
+      setError('Failed to remove item. Please try again.');
+    } finally {
+      setRemoving(null);
+    }
+  };
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -52,10 +68,18 @@ export function CartPage({ order, loading, error }: CartPageProps) {
                     Quantity: {line.quantity} × €{line.unitPrice.toFixed(2)}
                   </p>
                 </div>
-                <div className="text-right">
+                <div className="flex items-center gap-4">
                   <p className="text-lg font-bold text-blue-600">
                     €{line.lineTotal.toFixed(2)}
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveItem(line.menuItemId)}
+                    disabled={removing === line.menuItemId}
+                    className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {removing === line.menuItemId ? 'Removing...' : 'Remove'}
+                  </button>
                 </div>
               </div>
             ))}

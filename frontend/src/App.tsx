@@ -1,24 +1,14 @@
-import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { MenuPage } from './pages/MenuPage';
 import { CartPage } from './pages/CartPage';
 import { CartIcon } from './components/CartIcon';
-import type { Order } from './types/Order';
+import { CartProvider, useCart } from './contexts/CartContext';
 
 function AppContent() {
   const navigate = useNavigate();
-  const [order, setOrder] = useState<Order | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { cart } = useCart();
 
-  // In a real app, we would fetch the current order from the backend on mount
-  // For now, we'll just use local state that gets updated when items are added
-  useEffect(() => {
-    // Future: Fetch current order from backend
-    // This would call GET /api/order/current or similar
-  }, []);
-
-  const itemCount = order?.itemCount || 0;
+  const itemCount = cart?.itemCount || 0;
 
   const handleCartClick = () => {
     navigate('/cart');
@@ -49,7 +39,7 @@ function AppContent() {
               >
                 ← Back to Menu
               </button>
-              <CartPage order={order} loading={loading} error={error} />
+              <CartPage />
             </div>
           }
         />
@@ -61,7 +51,9 @@ function AppContent() {
 function App() {
   return (
     <BrowserRouter>
-      <AppContent />
+      <CartProvider>
+        <AppContent />
+      </CartProvider>
     </BrowserRouter>
   );
 }

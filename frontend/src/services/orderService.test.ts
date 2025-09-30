@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { addItemToOrder } from './orderService';
+import { addItemToOrder, getCart } from './orderService';
 import type { Order } from '../types/Order';
 import type { AddItemRequest } from '../types/AddItemRequest';
 
@@ -160,6 +160,123 @@ describe('orderService', () => {
           credentials: 'include',
         })
       );
+    });
+  });
+
+  describe('getCart', () => {
+    it('should successfully get cart with items', async () => {
+      const mockResponse: Order = {
+        orderId: 'order-456',
+        status: 'PENDING',
+        totalAmount: 37.5,
+        itemCount: 3,
+        orderLines: [
+          {
+            orderLineId: 'line-789',
+            menuItemId: 'item-123',
+            menuItemName: 'Paella Valenciana',
+            quantity: 2,
+            unitPrice: 12.5,
+            lineTotal: 25.0,
+          },
+          {
+            orderLineId: 'line-790',
+            menuItemId: 'item-124',
+            menuItemName: 'Gazpacho',
+            quantity: 1,
+            unitPrice: 12.5,
+            lineTotal: 12.5,
+          },
+        ],
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify(mockResponse),
+      });
+
+      const result = await getCart();
+
+      expect(result).toEqual(mockResponse);
+      expect(mockFetch).toHaveBeenCalledWith(`${API_BASE_URL}/api/order/cart`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+    });
+
+    it('should return null when cart is empty (empty response)', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () => '',
+      });
+
+      const result = await getCart();
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null when no session exists', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () => '',
+      });
+
+      const result = await getCart();
+
+      expect(result).toBeNull();
+    });
+
+    it('should throw error on network failure', async () => {
+      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+
+      await expect(getCart()).rejects.toThrow('Network error');
+    });
+
+    it('should include credentials for session management', async () => {
+      const mockResponse: Order = {
+        orderId: 'order-456',
+        status: 'PENDING',
+        totalAmount: 12.5,
+        itemCount: 1,
+        orderLines: [
+          {
+            orderLineId: 'line-789',
+            menuItemId: 'item-123',
+            menuItemName: 'Paella Valenciana',
+            quantity: 1,
+            unitPrice: 12.5,
+            lineTotal: 12.5,
+          },
+        ],
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify(mockResponse),
+      });
+
+      await getCart();
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          credentials: 'include',
+        })
+      );
+    });
+
+    it('should handle non-200 status codes', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+      });
+
+      await expect(getCart()).rejects.toThrow('HTTP error! status: 500');
     });
   });
 });

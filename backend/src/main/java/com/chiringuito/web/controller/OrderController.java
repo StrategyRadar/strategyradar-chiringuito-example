@@ -1,7 +1,11 @@
 package com.chiringuito.web.controller;
 
 import com.chiringuito.service.action.AddItemToOrderAction;
+import com.chiringuito.service.action.GetCartAction;
+import com.chiringuito.service.action.RemoveItemFromOrderAction;
+import com.chiringuito.service.action.UpdateItemQuantityAction;
 import com.chiringuito.service.dto.AddItemRequest;
+import com.chiringuito.service.dto.UpdateQuantityRequest;
 import com.chiringuito.service.dto.OrderSummaryDTO;
 import com.chiringuito.service.exception.MaxItemsExceededException;
 import com.chiringuito.service.exception.MenuItemNotFoundException;
@@ -12,18 +16,48 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/order")
 @RequiredArgsConstructor
 public class OrderController {
 
     private final AddItemToOrderAction addItemToOrderAction;
+    private final GetCartAction getCartAction;
+    private final RemoveItemFromOrderAction removeItemFromOrderAction;
+    private final UpdateItemQuantityAction updateItemQuantityAction;
 
     @PostMapping("/add-item")
     public ResponseEntity<OrderSummaryDTO> addItem(
             @RequestBody @jakarta.validation.Valid AddItemRequest request,
             HttpSession session) {
         OrderSummaryDTO summary = addItemToOrderAction.execute(request, session);
+        return ResponseEntity.ok(summary);
+    }
+
+    @GetMapping("/cart")
+    public ResponseEntity<OrderSummaryDTO> getCart(HttpSession session) {
+        OrderSummaryDTO summary = getCartAction.execute(session);
+        if (summary == null) {
+            return ResponseEntity.ok().build(); // Empty cart - return 200 with no body
+        }
+        return ResponseEntity.ok(summary);
+    }
+
+    @DeleteMapping("/remove-item/{menuItemId}")
+    public ResponseEntity<Void> removeItem(
+            @PathVariable UUID menuItemId,
+            HttpSession session) {
+        removeItemFromOrderAction.execute(menuItemId, session);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/update-quantity")
+    public ResponseEntity<OrderSummaryDTO> updateQuantity(
+            @RequestBody @jakarta.validation.Valid UpdateQuantityRequest request,
+            HttpSession session) {
+        OrderSummaryDTO summary = updateItemQuantityAction.execute(request, session);
         return ResponseEntity.ok(summary);
     }
 

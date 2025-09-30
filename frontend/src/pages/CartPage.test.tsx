@@ -1,34 +1,48 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
 import { CartPage } from './CartPage';
+import * as orderService from '../services/orderService';
 import type { Order } from '../types/Order';
 
-describe('CartPage', () => {
-  it('should display empty cart message when order is null', () => {
-    render(<CartPage order={null} loading={false} error={null} />);
+// Mock the orderService
+vi.mock('../services/orderService');
 
-    expect(screen.getByText(/your cart is empty/i)).toBeInTheDocument();
+describe('CartPage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it('should display loading state', () => {
-    render(<CartPage order={null} loading={true} error={null} />);
+  it('should display loading state initially', () => {
+    vi.spyOn(orderService, 'getCart').mockImplementation(() =>
+      new Promise(() => {}) // Never resolves to keep loading state
+    );
+
+    render(<CartPage />);
 
     expect(screen.getByText(/loading cart/i)).toBeInTheDocument();
   });
 
-  it('should display error message', () => {
-    render(
-      <CartPage
-        order={null}
-        loading={false}
-        error="Failed to load cart"
-      />
-    );
+  it('should display empty cart message when order is null', async () => {
+    vi.spyOn(orderService, 'getCart').mockResolvedValue(null);
 
-    expect(screen.getByText(/error.*failed to load cart/i)).toBeInTheDocument();
+    render(<CartPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/your cart is empty/i)).toBeInTheDocument();
+    });
   });
 
-  it('should display order items with details', () => {
+  it('should display error message on fetch failure', async () => {
+    vi.spyOn(orderService, 'getCart').mockRejectedValue(new Error('Network error'));
+
+    render(<CartPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/failed to load cart/i)).toBeInTheDocument();
+    });
+  });
+
+  it('should display order items with details', async () => {
     const mockOrder: Order = {
       orderId: 'order-123',
       status: 'PENDING',
@@ -54,15 +68,19 @@ describe('CartPage', () => {
       ],
     };
 
-    render(<CartPage order={mockOrder} loading={false} error={null} />);
+    vi.spyOn(orderService, 'getCart').mockResolvedValue(mockOrder);
 
-    expect(screen.getByText('Paella Valenciana')).toBeInTheDocument();
-    expect(screen.getByText('Gazpacho')).toBeInTheDocument();
-    expect(screen.getByText(/Quantity: 2/i)).toBeInTheDocument();
-    expect(screen.getByText(/Quantity: 1/i)).toBeInTheDocument();
+    render(<CartPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Paella Valenciana')).toBeInTheDocument();
+      expect(screen.getByText('Gazpacho')).toBeInTheDocument();
+      expect(screen.getByText(/Quantity: 2/i)).toBeInTheDocument();
+      expect(screen.getByText(/Quantity: 1/i)).toBeInTheDocument();
+    });
   });
 
-  it('should display unit prices and line totals', () => {
+  it('should display unit prices and line totals', async () => {
     const mockOrder: Order = {
       orderId: 'order-123',
       status: 'PENDING',
@@ -80,14 +98,18 @@ describe('CartPage', () => {
       ],
     };
 
-    render(<CartPage order={mockOrder} loading={false} error={null} />);
+    vi.spyOn(orderService, 'getCart').mockResolvedValue(mockOrder);
 
-    expect(screen.getByText(/Quantity: 2 × €12.50/i)).toBeInTheDocument();
-    const prices = screen.getAllByText('€25.00');
-    expect(prices).toHaveLength(2); // Line total and order total
+    render(<CartPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Quantity: 2 × €12.50/i)).toBeInTheDocument();
+      const prices = screen.getAllByText('€25.00');
+      expect(prices).toHaveLength(2); // Line total and order total
+    });
   });
 
-  it('should display order total amount', () => {
+  it('should display order total amount', async () => {
     const mockOrder: Order = {
       orderId: 'order-123',
       status: 'PENDING',
@@ -113,13 +135,17 @@ describe('CartPage', () => {
       ],
     };
 
-    render(<CartPage order={mockOrder} loading={false} error={null} />);
+    vi.spyOn(orderService, 'getCart').mockResolvedValue(mockOrder);
 
-    expect(screen.getByText(/total/i)).toBeInTheDocument();
-    expect(screen.getByText('€37.50')).toBeInTheDocument();
+    render(<CartPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/total/i)).toBeInTheDocument();
+      expect(screen.getByText('€37.50')).toBeInTheDocument();
+    });
   });
 
-  it('should display item count', () => {
+  it('should display item count', async () => {
     const mockOrder: Order = {
       orderId: 'order-123',
       status: 'PENDING',
@@ -145,12 +171,16 @@ describe('CartPage', () => {
       ],
     };
 
-    render(<CartPage order={mockOrder} loading={false} error={null} />);
+    vi.spyOn(orderService, 'getCart').mockResolvedValue(mockOrder);
 
-    expect(screen.getByText(/3.*item/i)).toBeInTheDocument();
+    render(<CartPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/3.*item/i)).toBeInTheDocument();
+    });
   });
 
-  it('should display correct singular/plural for item count', () => {
+  it('should display correct singular/plural for item count', async () => {
     const mockOrder: Order = {
       orderId: 'order-123',
       status: 'PENDING',
@@ -168,8 +198,12 @@ describe('CartPage', () => {
       ],
     };
 
-    render(<CartPage order={mockOrder} loading={false} error={null} />);
+    vi.spyOn(orderService, 'getCart').mockResolvedValue(mockOrder);
 
-    expect(screen.getByText('1 item')).toBeInTheDocument();
+    render(<CartPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('1 item')).toBeInTheDocument();
+    });
   });
 });

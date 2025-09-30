@@ -24,6 +24,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -254,5 +255,105 @@ class OrderControllerIntegrationTest {
         // Verify only one order was created
         assertThat(orderRepository.count()).isEqualTo(1);
         assertThat(orderLineRepository.count()).isEqualTo(1); // Same item, so quantity updated
+    }
+
+    @Test
+    void shouldReturnEmptyCartWhenNoOrderInSession() throws Exception {
+        // Given: Fresh session with no order
+        MockHttpSession freshSession = new MockHttpSession();
+
+        // When & Then
+        mockMvc.perform(get("/api/order/cart")
+                        .session(freshSession))
+                .andExpect(status().isOk())
+                .andExpect(content().string(""));
+    }
+
+    @Test
+    void shouldReturnCartWithItemsWhenOrderExists() throws Exception {
+        // Given: Add items to cart first
+        AddItemRequest request = AddItemRequest.builder()
+                .menuItemId(testMenuItem.getId())
+                .quantity(2)
+                .build();
+
+        String addResponse = mockMvc.perform(post("/api/order/add-item")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String orderId = objectMapper.readTree(addResponse).get("orderId").asText();
+
+        // When: Get cart
+        mockMvc.perform(get("/api/order/cart")
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderId").value(orderId))
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.totalAmount").value(31.98)) // 2 * 15.99
+                .andExpect(jsonPath("$.itemCount").value(2))
+                .andExpect(jsonPath("$.orderLines").isArray())
+                .andExpect(jsonPath("$.orderLines", hasSize(1)))
+                .andExpect(jsonPath("$.orderLines[0].menuItemName").value("Test Paella"))
+                .andExpect(jsonPath("$.orderLines[0].quantity").value(2));
+    }
+
+    @Test
+    void shouldReturnEmptyCartWhenOrderNotFoundInDatabase() throws Exception {
+        // Given: Session has order ID but order doesn't exist in DB
+        session.setAttribute("orderId", UUID.randomUUID().toString());
+
+        // When & Then
+        mockMvc.perform(get("/api/order/cart")
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(content().string(""));
+    }
+
+    @Test
+    void shouldReturnCartWithMultipleItemsAfterMultipleAdds() throws Exception {
+        // Given: Add first item
+        AddItemRequest request1 = AddItemRequest.builder()
+                .menuItemId(testMenuItem.getId())
+                .quantity(2)
+                .build();
+
+        mockMvc.perform(post("/api/order/add-item")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request1)))
+                .andExpect(status().isOk());
+
+        // Add second item (different menu item)
+        MenuItem anotherItem = MenuItem.builder()
+                .name("Test Gazpacho")
+                .description("Cold soup")
+                .price(new BigDecimal("8.50"))
+                .available(true)
+                .build();
+        anotherItem = menuItemRepository.save(anotherItem);
+
+        AddItemRequest request2 = AddItemRequest.builder()
+                .menuItemId(anotherItem.getId())
+                .quantity(3)
+                .build();
+
+        mockMvc.perform(post("/api/order/add-item")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request2)))
+                .andExpect(status().isOk());
+
+        // When: Get cart
+        mockMvc.perform(get("/api/order/cart")
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalAmount").value(57.48)) // (2 * 15.99) + (3 * 8.50)
+                .andExpect(jsonPath("$.itemCount").value(5)) // 2 + 3
+                .andExpect(jsonPath("$.orderLines", hasSize(2)));
     }
 }

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { getMenuItems } from '../services/menuService';
-import { addItemToOrder } from '../services/orderService';
+import { addItemToOrder, updateItemQuantity, removeItemFromOrder } from '../services/orderService';
 import { QuantitySelector } from '../components/QuantitySelector';
+import { useCart } from '../contexts/CartContext';
 import type { MenuItem } from '../types/MenuItem';
 
 export function MenuPage() {
@@ -12,16 +13,35 @@ export function MenuPage() {
   const [addingToCart, setAddingToCart] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [cartError, setCartError] = useState<string | null>(null);
+  const { cart, refreshCart } = useCart();
+
+  // Sync quantities with cart contents
+  useEffect(() => {
+    if (cart) {
+      const cartQuantities: Record<string, number> = {};
+      cart.orderLines.forEach((line) => {
+        cartQuantities[line.menuItemId] = line.quantity;
+      });
+
+      setQuantities((prev) => {
+        const newQuantities = { ...prev };
+        Object.keys(newQuantities).forEach((itemId) => {
+          newQuantities[itemId] = cartQuantities[itemId] || 0;
+        });
+        return newQuantities;
+      });
+    }
+  }, [cart]);
 
   useEffect(() => {
     async function loadMenu() {
       try {
         const items = await getMenuItems();
         setMenuItems(items);
-        // Initialize quantities to 1 for each item
+        // Initialize quantities to 0 for each item
         const initialQuantities: Record<string, number> = {};
         items.forEach((item) => {
-          initialQuantities[item.id] = 1;
+          initialQuantities[item.id] = 0;
         });
         setQuantities(initialQuantities);
       } catch (err) {
@@ -34,11 +54,32 @@ export function MenuPage() {
     loadMenu();
   }, []);
 
-  const handleQuantityChange = (itemId: string, newQuantity: number) => {
+  const handleQuantityChange = async (itemId: string, newQuantity: number) => {
+    // Update local state immediately for responsive UI
     setQuantities((prev) => ({
       ...prev,
       [itemId]: newQuantity,
     }));
+
+    // If item is already in cart, update quantity via API or remove if 0
+    const existingLine = cart?.orderLines.find((line) => line.menuItemId === itemId);
+    if (existingLine && cart) {
+      try {
+        if (newQuantity === 0) {
+          // Remove item from cart when quantity reaches 0
+          await removeItemFromOrder(itemId);
+        } else {
+          // Update quantity
+          await updateItemQuantity(itemId, newQuantity);
+        }
+        await refreshCart();
+      } catch (err) {
+        setCartError('Failed to update quantity. Please try again.');
+        setTimeout(() => {
+          setCartError(null);
+        }, 3000);
+      }
+    }
   };
 
   const handleAddToCart = async (item: MenuItem) => {
@@ -47,17 +88,14 @@ export function MenuPage() {
     setCartError(null);
 
     try {
+      // Always add 1 item, like the plus button
       await addItemToOrder({
         menuItemId: item.id,
-        quantity: quantities[item.id] || 1,
+        quantity: 1,
       });
 
       setSuccessMessage(`${item.name} added to cart!`);
-      // Reset quantity to 1 after successful add
-      setQuantities((prev) => ({
-        ...prev,
-        [item.id]: 1,
-      }));
+      await refreshCart();
 
       // Clear success message after 3 seconds
       setTimeout(() => {
@@ -104,17 +142,19 @@ export function MenuPage() {
           El Chiringuito Menu
         </h1>
 
-        {/* Success/Error messages */}
-        {successMessage && (
-          <div className="mb-4 p-4 bg-green-100 text-green-800 rounded-lg text-center">
-            {successMessage}
-          </div>
-        )}
-        {cartError && (
-          <div className="mb-4 p-4 bg-red-100 text-red-800 rounded-lg text-center">
-            {cartError}
-          </div>
-        )}
+        {/* Success/Error messages with fixed height to prevent layout shift */}
+        <div className="mb-4 h-14 flex items-center justify-center">
+          {successMessage && (
+            <div className="w-full p-4 bg-green-100 text-green-800 rounded-lg text-center">
+              {successMessage}
+            </div>
+          )}
+          {cartError && (
+            <div className="w-full p-4 bg-red-100 text-red-800 rounded-lg text-center">
+              {cartError}
+            </div>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {menuItems.map((item) => (
@@ -136,7 +176,7 @@ export function MenuPage() {
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-sm text-gray-600">Quantity:</span>
                   <QuantitySelector
-                    quantity={quantities[item.id] || 1}
+                    quantity={quantities[item.id] ?? 0}
                     onChange={(newQuantity) =>
                       handleQuantityChange(item.id, newQuantity)
                     }

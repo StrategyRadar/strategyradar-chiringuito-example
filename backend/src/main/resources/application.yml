@@ -38,6 +38,13 @@ spring:
   flyway:
     locations: classpath:db/migration
 
+server:
+  servlet:
+    session:
+      cookie:
+        same-site: lax  # Use 'lax' for localhost development (both frontend and backend on same machine)
+        secure: false  # Allow non-HTTPS in local development
+
 ---
 spring:
   config:

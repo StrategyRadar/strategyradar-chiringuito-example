@@ -8,7 +8,7 @@ interface QuantitySelectorProps {
 export function QuantitySelector({
   quantity,
   onChange,
-  min = 1,
+  min = 0,
   max = 50,
 }: QuantitySelectorProps) {
   const handleDecrement = () => {

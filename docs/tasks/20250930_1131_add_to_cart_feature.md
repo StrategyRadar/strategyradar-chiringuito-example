@@ -3,9 +3,10 @@
 ## Metadata
 - **Task ID**: 20250930_1131_add_to_cart_feature
 - **Created**: 2025-09-30 11:31 UTC
-- **Status**: IMPLEMENTATION
+- **Status**: COMPLETED
 - **Assignee**: Javier (tdd-java-spring-engineer), Rex (tdd-react-typescript-engineer)
 - **Branch**: add_to_cart_feature
+- **Completed**: 2025-09-30 13:05 UTC
 
 ## Problem Statement
 
@@ -500,6 +501,21 @@ Integration test scenarios:
   - React Router configured for navigation
   - All 49 tests passing (43 new + 6 existing)
   - Frontend DoD completed 100%
+- 2025-09-30 13:05 UTC - Additional improvements and bug fixes:
+  - Fixed cart badge delay issue by implementing CartContext with refreshCart() after operations
+  - Changed "Add to Cart" button behavior to always add 1 item (consistent with plus button)
+  - Fixed initial quantity display to start at 0 for consistency
+  - Fixed H2 database initialization issue (restarted backend to run Flyway migrations)
+  - Fixed quantity selector to use nullish coalescing (??) instead of logical OR (||) for proper 0 handling
+  - Implemented remove item when quantity reaches 0 via minus button
+  - Added comprehensive tests for RemoveItemFromOrderAction (7 test cases)
+  - All backend tests passing: 33 tests total (26 existing + 7 new for remove functionality)
+- 2025-09-30 13:05 UTC - Task completed and closed by task-coordinator:
+  - All DoD items satisfied
+  - Backend: 33 tests passing (100% coverage for new code)
+  - Frontend: 49 tests passing (100% coverage for new components)
+  - Manual verification completed
+  - Feature ready for merge to main branch
 
 ## Notes
 This task builds on the menu browsing feature by introducing order management. It focuses on cart functionality without external dependencies (no payment, no SMS), making it a clean vertical slice. The implementation establishes:
