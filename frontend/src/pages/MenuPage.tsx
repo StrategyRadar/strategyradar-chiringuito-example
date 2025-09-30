@@ -1,17 +1,29 @@
 import { useEffect, useState } from 'react';
 import { getMenuItems } from '../services/menuService';
+import { addItemToOrder } from '../services/orderService';
+import { QuantitySelector } from '../components/QuantitySelector';
 import type { MenuItem } from '../types/MenuItem';
 
 export function MenuPage() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [addingToCart, setAddingToCart] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [cartError, setCartError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadMenu() {
       try {
         const items = await getMenuItems();
         setMenuItems(items);
+        // Initialize quantities to 1 for each item
+        const initialQuantities: Record<string, number> = {};
+        items.forEach((item) => {
+          initialQuantities[item.id] = 1;
+        });
+        setQuantities(initialQuantities);
       } catch (err) {
         setError('Failed to load menu. Please try again later.');
       } finally {
@@ -21,6 +33,45 @@ export function MenuPage() {
 
     loadMenu();
   }, []);
+
+  const handleQuantityChange = (itemId: string, newQuantity: number) => {
+    setQuantities((prev) => ({
+      ...prev,
+      [itemId]: newQuantity,
+    }));
+  };
+
+  const handleAddToCart = async (item: MenuItem) => {
+    setAddingToCart(item.id);
+    setSuccessMessage(null);
+    setCartError(null);
+
+    try {
+      await addItemToOrder({
+        menuItemId: item.id,
+        quantity: quantities[item.id] || 1,
+      });
+
+      setSuccessMessage(`${item.name} added to cart!`);
+      // Reset quantity to 1 after successful add
+      setQuantities((prev) => ({
+        ...prev,
+        [item.id]: 1,
+      }));
+
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setSuccessMessage(null);
+      }, 3000);
+    } catch (err) {
+      setCartError('Failed to add item to cart. Please try again.');
+      setTimeout(() => {
+        setCartError(null);
+      }, 3000);
+    } finally {
+      setAddingToCart(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -52,6 +103,19 @@ export function MenuPage() {
         <h1 className="text-3xl font-bold text-center mb-8 mt-4">
           El Chiringuito Menu
         </h1>
+
+        {/* Success/Error messages */}
+        {successMessage && (
+          <div className="mb-4 p-4 bg-green-100 text-green-800 rounded-lg text-center">
+            {successMessage}
+          </div>
+        )}
+        {cartError && (
+          <div className="mb-4 p-4 bg-red-100 text-red-800 rounded-lg text-center">
+            {cartError}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {menuItems.map((item) => (
             <div
@@ -62,13 +126,32 @@ export function MenuPage() {
                 <span className="text-8xl">{item.imageUrl}</span>
               </div>
               <div className="p-4">
-                <h2 className="text-xl font-semibold mb-2">
-                  {item.name}
-                </h2>
+                <h2 className="text-xl font-semibold mb-2">{item.name}</h2>
                 <p className="text-gray-600 mb-4">{item.description}</p>
-                <p className="text-lg font-bold text-blue-600">
+                <p className="text-lg font-bold text-blue-600 mb-4">
                   €{item.price.toFixed(2)}
                 </p>
+
+                {/* Quantity Selector */}
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-sm text-gray-600">Quantity:</span>
+                  <QuantitySelector
+                    quantity={quantities[item.id] || 1}
+                    onChange={(newQuantity) =>
+                      handleQuantityChange(item.id, newQuantity)
+                    }
+                  />
+                </div>
+
+                {/* Add to Cart Button */}
+                <button
+                  type="button"
+                  onClick={() => handleAddToCart(item)}
+                  disabled={addingToCart === item.id}
+                  className="w-full py-2 px-4 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  {addingToCart === item.id ? 'Adding...' : 'Add to Cart'}
+                </button>
               </div>
             </div>
           ))}
