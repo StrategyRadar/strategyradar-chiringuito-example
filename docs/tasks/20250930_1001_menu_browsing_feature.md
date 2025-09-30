@@ -246,17 +246,17 @@ tests/
 ## Definition of Done
 
 ### Backend
-- [ ] Spring Boot project initialized with correct dependencies
-- [ ] MenuItem entity created with all fields from entity-model.md
-- [ ] MenuItemRepository implemented (extends JpaRepository)
-- [ ] BrowseMenuAction service implements query logic
-- [ ] MenuController exposes GET /api/menu endpoint
-- [ ] Database migrations created (schema + sample data)
-- [ ] CORS configuration allows frontend origin
-- [ ] Unit tests written and passing (BrowseMenuAction)
-- [ ] Integration tests written and passing (MenuController)
-- [ ] API returns correct JSON structure
-- [ ] All tests pass (`mvn test`)
+- [x] Spring Boot project initialized with correct dependencies
+- [x] MenuItem entity created with all fields from entity-model.md
+- [x] MenuItemRepository implemented (extends JpaRepository)
+- [x] BrowseMenuAction service implements query logic
+- [x] MenuController exposes GET /api/menu endpoint
+- [x] Database migrations created (schema + sample data)
+- [x] CORS configuration allows frontend origin
+- [x] Unit tests written and passing (BrowseMenuAction)
+- [x] Integration tests written and passing (MenuController)
+- [x] API returns correct JSON structure
+- [x] All tests pass (`mvn test`)
 
 ### Frontend
 - [ ] React TypeScript project initialized with Vite
@@ -295,6 +295,19 @@ tests/
 - 2025-09-30 10:01 UTC - Task created by task-coordinator for minimal viable feature implementation
 - 2025-09-30 12:10 CEST - User reviewed and approved task with simplifications: H2 for local dev, DevTools enabled, no testcontainers, no performance focus initially, TDD approach confirmed, mobile-first design confirmed
 - 2025-09-30 12:10 CEST - Task ready for IMPLEMENTATION phase, handing off to Javier (backend) and Rex (frontend)
+- 2025-09-30 10:23 UTC - Backend implementation completed by Javier following strict TDD approach:
+  - Spring Boot 3.5.6 initialized with Java 24
+  - Database configuration with H2 (local) and PostgreSQL (prod) profiles
+  - Flyway migrations created (V1: schema, V2: 10 sample menu items)
+  - MenuItem entity with JPA annotations and validations
+  - MenuItemRepository with custom query method
+  - BrowseMenuActionTest with 3 unit tests (written first)
+  - BrowseMenuAction implementation (written after tests)
+  - MenuControllerIntegrationTest with 4 integration tests (written first)
+  - MenuController with GET /api/menu endpoint (written after tests)
+  - CorsConfig for local development (localhost:5173)
+  - All 8 tests passing ✓ (3 unit + 4 integration + 1 application context)
+  - Backend DoD completed 100%
 
 ## Notes
 This task represents the minimal vertical slice to demonstrate the system working end-to-end. It focuses solely on menu browsing, which requires no external integrations (Stripe/Twilio) and has no complex business logic. This makes it ideal for:
