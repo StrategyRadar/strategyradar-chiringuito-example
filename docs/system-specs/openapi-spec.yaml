@@ -1,0 +1,703 @@
+openapi: 3.0.3
+info:
+  title: El Chiringuito API
+  description: REST API for El Chiringuito restaurant ordering system
+  version: 1.0.0
+  contact:
+    name: El Chiringuito Support
+    email: support@elchiringuito.com
+
+servers:
+  - url: http://localhost:8080/api
+    description: Development server
+  - url: https://api.elchiringuito.com/api
+    description: Production server
+
+tags:
+  - name: Menu
+    description: Menu browsing operations
+  - name: Orders
+    description: Order management operations
+  - name: Payment
+    description: Payment processing operations
+  - name: Kitchen
+    description: Kitchen staff operations
+  - name: Waiter
+    description: Waiter staff operations
+
+paths:
+  /menu:
+    get:
+      tags:
+        - Menu
+      summary: Browse available menu items
+      description: Retrieves all available menu items for customer ordering
+      operationId: browseMenu
+      responses:
+        '200':
+          description: Menu items retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MenuItem'
+              examples:
+                menu:
+                  summary: Sample menu
+                  value:
+                    - id: 550e8400-e29b-41d4-a716-446655440000
+                      name: Paella Valenciana
+                      description: Traditional Spanish rice dish with seafood
+                      price: 12.50
+                      imageUrl: https://example.com/paella.jpg
+                      available: true
+                    - id: 550e8400-e29b-41d4-a716-446655440001
+                      name: Tortilla Española
+                      description: Spanish potato omelette
+                      price: 6.00
+                      imageUrl: https://example.com/tortilla.jpg
+                      available: true
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /order/add-item:
+    post:
+      tags:
+        - Orders
+      summary: Add item to order
+      description: Adds a menu item with quantity to the customer's order
+      operationId: addItemToOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddItemRequest'
+            examples:
+              addItem:
+                summary: Add 2 paellas
+                value:
+                  menuItemId: 550e8400-e29b-41d4-a716-446655440000
+                  quantity: 2
+      responses:
+        '200':
+          description: Item added successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          description: Menu item not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /order/contact:
+    patch:
+      tags:
+        - Orders
+      summary: Add customer contact information
+      description: Adds customer phone number to order for SMS notifications
+      operationId: updateContact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContactRequest'
+            examples:
+              addContact:
+                summary: Add phone number
+                value:
+                  orderId: 550e8400-e29b-41d4-a716-446655440010
+                  customerPhone: "+34612345678"
+      responses:
+        '200':
+          description: Contact information added successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          description: Order not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /payment/process:
+    post:
+      tags:
+        - Payment
+      summary: Process payment for order
+      description: Processes payment via Stripe and confirms order if successful
+      operationId: processPayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentRequest'
+            examples:
+              payment:
+                summary: Process payment
+                value:
+                  orderId: 550e8400-e29b-41d4-a716-446655440010
+                  stripeToken: tok_visa
+      responses:
+        '200':
+          description: Payment processed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResult'
+              examples:
+                success:
+                  summary: Successful payment
+                  value:
+                    success: true
+                    referenceNumber: ORD-20250930-001
+                    orderId: 550e8400-e29b-41d4-a716-446655440010
+                    status: PREPARING
+                    message: Order confirmed! You will receive SMS when ready.
+        '400':
+          description: Payment validation or processing failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResult'
+              examples:
+                failed:
+                  summary: Failed payment
+                  value:
+                    success: false
+                    message: Payment declined - insufficient funds
+                    errorCode: card_declined
+                outsideHours:
+                  summary: Outside operating hours
+                  value:
+                    success: false
+                    message: Orders only accepted between 11:30 and 23:30
+                    errorCode: outside_operating_hours
+        '404':
+          description: Order not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /kitchen/orders:
+    get:
+      tags:
+        - Kitchen
+      summary: Get order queue for kitchen
+      description: Retrieves all orders with PREPARING status in FIFO order
+      operationId: getKitchenOrders
+      responses:
+        '200':
+          description: Order queue retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/KitchenOrder'
+              examples:
+                queue:
+                  summary: Kitchen order queue
+                  value:
+                    - orderId: 550e8400-e29b-41d4-a716-446655440010
+                      referenceNumber: ORD-20250930-001
+                      items:
+                        - menuItemName: Paella Valenciana
+                          quantity: 2
+                        - menuItemName: Tortilla Española
+                          quantity: 1
+                      createdAt: "2025-09-30T12:30:00Z"
+                    - orderId: 550e8400-e29b-41d4-a716-446655440011
+                      referenceNumber: ORD-20250930-002
+                      items:
+                        - menuItemName: Gazpacho
+                          quantity: 3
+                      createdAt: "2025-09-30T12:32:00Z"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /kitchen/mark-ready/{orderId}:
+    post:
+      tags:
+        - Kitchen
+      summary: Mark order as ready
+      description: Updates order status to READY and sends SMS notification to customer
+      operationId: markOrderReady
+      parameters:
+        - name: orderId
+          in: path
+          description: Order identifier
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Order marked as ready successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarkReadyResult'
+              examples:
+                success:
+                  summary: SMS sent successfully
+                  value:
+                    success: true
+                    orderId: 550e8400-e29b-41d4-a716-446655440010
+                    status: READY
+                    smsSent: true
+                failed:
+                  summary: SMS failed
+                  value:
+                    success: true
+                    orderId: 550e8400-e29b-41d4-a716-446655440010
+                    status: READY
+                    smsSent: false
+                    smsError: Invalid phone number
+        '400':
+          description: Order cannot be marked ready (invalid status)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Order not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /waiter/ready-orders:
+    get:
+      tags:
+        - Waiter
+      summary: Get ready orders for pickup
+      description: Retrieves all orders with READY status including wait times and SMS status
+      operationId: getReadyOrders
+      responses:
+        '200':
+          description: Ready orders retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WaiterOrder'
+              examples:
+                orders:
+                  summary: Ready orders
+                  value:
+                    - orderId: 550e8400-e29b-41d4-a716-446655440010
+                      referenceNumber: ORD-20250930-001
+                      customerPhone: "+34612345678"
+                      readyAt: "2025-09-30T13:00:00Z"
+                      waitTimeMinutes: 8
+                      smsStatus: SENT
+                    - orderId: 550e8400-e29b-41d4-a716-446655440011
+                      referenceNumber: ORD-20250930-002
+                      customerPhone: "+34698765432"
+                      readyAt: "2025-09-30T12:55:00Z"
+                      waitTimeMinutes: 13
+                      smsStatus: FAILED
+                      smsError: Network error
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /waiter/mark-picked-up/{orderId}:
+    post:
+      tags:
+        - Waiter
+      summary: Mark order as picked up
+      description: Updates order status to PICKED_UP when customer collects order
+      operationId: markOrderPickedUp
+      parameters:
+        - name: orderId
+          in: path
+          description: Order identifier
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Order marked as picked up successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarkPickedUpResult'
+              examples:
+                success:
+                  summary: Order picked up
+                  value:
+                    success: true
+                    orderId: 550e8400-e29b-41d4-a716-446655440010
+                    status: PICKED_UP
+                    pickupTimeMinutes: 8
+        '400':
+          description: Order cannot be marked picked up (invalid status)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Order not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  schemas:
+    MenuItem:
+      type: object
+      required:
+        - id
+        - name
+        - price
+        - available
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique menu item identifier
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Menu item name
+        description:
+          type: string
+          maxLength: 500
+          description: Menu item description
+        price:
+          type: number
+          format: double
+          minimum: 0.01
+          description: Price in euros
+        imageUrl:
+          type: string
+          format: uri
+          maxLength: 500
+          description: URL to item image
+        available:
+          type: boolean
+          description: Whether item is currently available
+
+    Order:
+      type: object
+      required:
+        - id
+        - status
+        - totalAmount
+        - items
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique order identifier
+        referenceNumber:
+          type: string
+          description: Human-readable order reference (e.g., ORD-20250930-001)
+        customerPhone:
+          type: string
+          maxLength: 20
+          description: Customer phone number for SMS
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        totalAmount:
+          type: number
+          format: double
+          minimum: 0
+          description: Total order amount in euros
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderLineResponse'
+          description: Items in the order
+        createdAt:
+          type: string
+          format: date-time
+          description: Order creation timestamp
+        paidAt:
+          type: string
+          format: date-time
+          description: Payment timestamp
+
+    OrderLineResponse:
+      type: object
+      required:
+        - menuItemId
+        - menuItemName
+        - quantity
+        - unitPrice
+        - lineTotal
+      properties:
+        menuItemId:
+          type: string
+          format: uuid
+        menuItemName:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+        unitPrice:
+          type: number
+          format: double
+        lineTotal:
+          type: number
+          format: double
+
+    AddItemRequest:
+      type: object
+      required:
+        - menuItemId
+        - quantity
+      properties:
+        menuItemId:
+          type: string
+          format: uuid
+          description: Menu item to add
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 50
+          description: Quantity to add
+
+    ContactRequest:
+      type: object
+      required:
+        - orderId
+        - customerPhone
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        customerPhone:
+          type: string
+          pattern: '^\+?[1-9]\d{1,14}$'
+          description: Phone number in international format
+
+    PaymentRequest:
+      type: object
+      required:
+        - orderId
+        - stripeToken
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        stripeToken:
+          type: string
+          description: Stripe payment token
+
+    PaymentResult:
+      type: object
+      required:
+        - success
+      properties:
+        success:
+          type: boolean
+          description: Whether payment succeeded
+        referenceNumber:
+          type: string
+          description: Order reference number (only if successful)
+        orderId:
+          type: string
+          format: uuid
+          description: Order identifier
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        message:
+          type: string
+          description: Success or error message
+        errorCode:
+          type: string
+          description: Error code if payment failed
+
+    KitchenOrder:
+      type: object
+      required:
+        - orderId
+        - referenceNumber
+        - items
+        - createdAt
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        referenceNumber:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/KitchenOrderItem'
+        createdAt:
+          type: string
+          format: date-time
+
+    KitchenOrderItem:
+      type: object
+      required:
+        - menuItemName
+        - quantity
+      properties:
+        menuItemName:
+          type: string
+        quantity:
+          type: integer
+
+    MarkReadyResult:
+      type: object
+      required:
+        - success
+        - orderId
+        - status
+        - smsSent
+      properties:
+        success:
+          type: boolean
+        orderId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        smsSent:
+          type: boolean
+          description: Whether SMS was successfully sent
+        smsError:
+          type: string
+          description: SMS error message if send failed
+
+    WaiterOrder:
+      type: object
+      required:
+        - orderId
+        - referenceNumber
+        - customerPhone
+        - readyAt
+        - waitTimeMinutes
+        - smsStatus
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        referenceNumber:
+          type: string
+        customerPhone:
+          type: string
+        readyAt:
+          type: string
+          format: date-time
+        waitTimeMinutes:
+          type: integer
+          description: Minutes since order was marked ready
+        smsStatus:
+          $ref: '#/components/schemas/SMSStatus'
+        smsError:
+          type: string
+          description: SMS error message if send failed
+
+    MarkPickedUpResult:
+      type: object
+      required:
+        - success
+        - orderId
+        - status
+      properties:
+        success:
+          type: boolean
+        orderId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        pickupTimeMinutes:
+          type: integer
+          description: Minutes between ready and pickup
+
+    OrderStatus:
+      type: string
+      enum:
+        - PENDING
+        - PREPARING
+        - READY
+        - PICKED_UP
+      description: Current order status
+
+    SMSStatus:
+      type: string
+      enum:
+        - SENT
+        - FAILED
+      description: SMS delivery status
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error type
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: object
+          description: Additional error details
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            validation:
+              summary: Validation error
+              value:
+                error: validation_error
+                message: Quantity must be between 1 and 50
+            maxItems:
+              summary: Max items exceeded
+              value:
+                error: max_items_exceeded
+                message: Maximum 50 items per order
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            serverError:
+              summary: Server error
+              value:
+                error: internal_error
+                message: An unexpected error occurred. Please try again.
