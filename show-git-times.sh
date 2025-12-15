@@ -1,0 +1,1 @@
+git log --pretty=format:"%C(yellow)%h%C(reset) - %C(cyan)%ad%C(reset) - %C(green)%s%C(reset)" --date=format:"%Y-%m-%d %H:%M"
